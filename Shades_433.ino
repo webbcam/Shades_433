@@ -13,10 +13,13 @@
 #define SHADES_MIN 704
 #define SHADES_MAX 767
 
-#define SERVO_PIN 9
-#define BUTTON_PIN 4
-#define LED_PIN 8
+#define SERVO_PIN 1
+#define BUTTON_PIN 8
+#define LED_PIN 13
 #define TIMEOUT 3000
+#define BLINK_SPD 500
+
+#define INTERRUPT_PIN 0
 
 
 
@@ -64,7 +67,7 @@ void setup() {
     }
   }
   
-  mySwitch.enableReceive(1);  //  Receiver on interrupt 1 => pin #3
+  mySwitch.enableReceive(INTERRUPT_PIN);  //  Receiver on interrupt 1 => pin #3
   /*
   Serial.print("shade_ID is: ");
   Serial.println(shade_ID);
@@ -157,9 +160,9 @@ void set_shade_ID(byte id) {
   //  signal that the new shade_ID has been successfully set
   for (int i = 0; i < 4; i++) {
     digitalWrite(LED_PIN, HIGH);
-    delay(100);
+    delay(BLINK_SPD);
     digitalWrite(LED_PIN, LOW);
-    delay(100);
+    delay(BLINK_SPD);
   }
 }
 
@@ -227,9 +230,9 @@ void set_remote_ID(void) {
   //  signal that the new remote_ID has been successfully set
   for (int i = 0; i < 4; i++) {
     digitalWrite(LED_PIN, HIGH);
-    delay(100);
+    delay(BLINK_SPD);
     digitalWrite(LED_PIN, LOW);
-    delay(100);
+    delay(BLINK_SPD);
   }
 
   mySwitch.resetAvailable();
