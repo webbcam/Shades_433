@@ -4,8 +4,10 @@
 
 #include <EEPROM.h>
 
+#define LED A1
+
 void setup() {
-  pinMode(12, OUTPUT);
+  pinMode(LED, OUTPUT);
   // put your setup code here, to run once:
   EEPROM.write(0, 0);   //  set shade_ID to 0
   EEPROM.write(1, 2);   //  point remote_ID to first open space
@@ -18,6 +20,6 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  digitalWrite(12, HIGH);
+  digitalWrite(LED, LOW);
 
 }
