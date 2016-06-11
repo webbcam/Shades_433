@@ -7,12 +7,14 @@
 #define LED A1
 
 void setup() {
+  byte zero = 0;
+  byte one = 1;
   pinMode(LED, OUTPUT);
   // put your setup code here, to run once:
-  EEPROM.write(0, 0);   //  set shade_ID to 0
-  EEPROM.write(1, 2);   //  point remote_ID to first open space
+  EEPROM.write(zero, zero);   //  set shade_ID to 0
+  EEPROM.write(one, 2);   //  point remote_ID to first open space
   //  clear out remote_ID
-  for (int i = 2; i < 8; i++) {
+  for (byte i = 2; i < 8; i++) {
     EEPROM.write(i, 0);
   }
 

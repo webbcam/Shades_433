@@ -1,13 +1,14 @@
 #include <RCSwitch.h>
 #include <EEPROM.h>
-#include <Signal_Parser.h>
-
-
+#include "Signal_Parser.h"
 #include <Servo.h>          //  Uncomment for 16-bit MCUs
 //#include <Adafruit_SoftServo.h> //  Uncomment for 8-bit MCUs
 
 #define PREAMBLE 666
+#define SHADES_PREAMBLE 10667
+#define PARSE_SHADES_PREAMBLE(sig)  (( (sig) >> 10) & 0x3FFF)
 
+//  SHADES SETTINGS:
 #define OFFSET 75
 #define SPEED 15
 #define INTERVAL 5
@@ -15,15 +16,15 @@
 #define SHADES_MIN 704
 #define SHADES_MAX 767
 
-
+//  PINS:
 #define SERVO_PIN 4
 #define BUTTON_PIN 8
 #define LED_PIN A1
+#define INTERRUPT_PIN 0
 
+//  SYNC SETTINGS:
 #define TIMEOUT 3000
 #define BLINK_SPD 100
-
-#define INTERRUPT_PIN 0
 
 
 
@@ -37,6 +38,7 @@ byte shade_ID = EEPROM.read(0);
 
 unsigned long remote_ID[3];         //  array to hold remote_IDs (20-bits long)
 byte EEPROM_ptr = EEPROM.read(1);   //  used as EEPROM stack ptr (points to most recently added remote ID)
+//byte EEPROM_ptr = 2;
 byte ID_ptr = EEPROM_ptr/2 - 1;     //  used to traverse thru remote_ID array-addresses (i.e. 0,1,2)
 //  set initial shades postion
 int pos = OFFSET;
@@ -76,12 +78,12 @@ void setup() {
   
   //Serial.print("shade_ID is: ");
   //Serial.println(shade_ID);
-  for (int i = 0; i < 3; i++) {
+  //for (int i = 0; i < 3; i++) {
     //Serial.print("remote_ID");
     //Serial.print(i + 1);
     //Serial.print(" is: ");
     //Serial.println(remote_ID[i]);
-  }
+ // }
   //Serial.print("EEPROM_ptr is: ");
   //Serial.println(EEPROM_ptr);
   
@@ -151,8 +153,10 @@ void loop() {
     
     mySwitch.resetAvailable();
   }
-  
 }
+
+
+
 
 void adjust_shade(int deg) {
   myServo.attach(SERVO_PIN);
@@ -179,19 +183,25 @@ void sync(void) {
   timeout = millis() + TIMEOUT;
   while (!mySwitch.available() && millis() < timeout)
     ; // wait until we get a signal
+    
   sig = mySwitch.getReceivedValue();
+  //Serial.print("sig is: ");//Serial.println(sig);
   //Serial.print("Preamble is: ");//Serial.println(parse_preamble(sig));
-  if (parse_preamble(sig) == PREAMBLE) {
+  //Serial.print("Postamble is: ");//Serial.println(parse_postamble(sig));
+//  if (parse_preamble(sig) == PREAMBLE ) {
+  //Serial.print("sig >> 10 is: ");//Serial.println(sig >> 10);
+  //Serial.print("(sig >> 10) & 0x3FFF is: ");//Serial.println((sig >> 10) & 0x3FFF);
+  if ( PARSE_SHADES_PREAMBLE(sig) == SHADES_PREAMBLE) {
     byte postamble = parse_postamble(sig);
     if (postamble > 7 && postamble < 12)
       set_shade_ID(postamble);
-    //else
+//    else
       //Serial.println("ERROR: invalid shade_ID\nMust be a number from 8-11!");
   } else {
     set_remote_ID(sig);
   }
   
-  delay(250);
+  delay(500);
   mySwitch.resetAvailable();
   digitalWrite(LED_PIN, HIGH);
   
@@ -211,12 +221,9 @@ void set_shade_ID(byte id) {
 }
 
 void set_remote_ID(unsigned long sig) {
-//  unsigned long sig;      //  holds the signal without postamble
   unsigned int ch;        //  holds the 10-bit channel/load
-//  unsigned long timeout;  //  if timeout occurs, erase stored signal
   byte lsb, msb;
   
-//  sig = mySwitch.getReceivedValue() >> 4; //  get signal and remove postamble
   sig = sig >> 4;
   //Serial.print("ReceivedValue: ");
   //Serial.println(sig);
@@ -270,3 +277,4 @@ void set_remote_ID(unsigned long sig) {
 
   mySwitch.resetAvailable();
 }
+
