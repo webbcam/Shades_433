@@ -35,20 +35,31 @@ RCSwitch mySwitch = RCSwitch();
 
 //  get shade ID
 byte shade_ID = EEPROM.read(0);
+//byte shade_ID = 0;
 
 unsigned long remote_ID[3];         //  array to hold remote_IDs (20-bits long)
 byte EEPROM_ptr = EEPROM.read(1);   //  used as EEPROM stack ptr (points to most recently added remote ID)
-//byte EEPROM_ptr = 2;
+
 byte ID_ptr = EEPROM_ptr/2 - 1;     //  used to traverse thru remote_ID array-addresses (i.e. 0,1,2)
 //  set initial shades postion
 int pos = OFFSET;
 
 
 void setup() {
-  //Serial.begin(9600);
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH);
   pinMode(BUTTON_PIN, INPUT);
+
+  //  Initialize board if it has not been initialized
+  if (shade_ID > 3) {
+    EEPROM.write(0,0);
+    shade_ID = 0;
+  }
+  if (EEPROM_ptr < 2 || EEPROM_ptr > 6) {
+    EEPROM.write(1,2);
+    EEPROM_ptr = 2;
+    ID_ptr = EEPROM_ptr/2 - 1;
+  }
   
   //  get remote IDs (x3)
   byte addr = 2;
@@ -75,18 +86,6 @@ void setup() {
   }
   
   mySwitch.enableReceive(INTERRUPT_PIN);  //  Receiver on interrupt 1 => pin #3
-  
-  //Serial.print("shade_ID is: ");
-  //Serial.println(shade_ID);
-  //for (int i = 0; i < 3; i++) {
-    //Serial.print("remote_ID");
-    //Serial.print(i + 1);
-    //Serial.print(" is: ");
-    //Serial.println(remote_ID[i]);
- // }
-  //Serial.print("EEPROM_ptr is: ");
-  //Serial.println(EEPROM_ptr);
-  
 }
 
 void loop() {
@@ -102,34 +101,26 @@ void loop() {
     
     // get data from signal if using our preamble/range of signals
     if (preamble == PREAMBLE) {
-      //Serial.println("Correct PREAMBLE!!");
+      
       unsigned int load = parse_load(value);
       //  check for shades signal (from BLE Box)
-      if (load >= SHADES_MIN && load <= SHADES_MAX) {
-        //Serial.println("Definitely talking about the shades here!");
-        //  check for corresponding shade
-        //Serial.print("shade_ID is: ");//Serial.println(shade_ID);
-        //Serial.print("received shade_ID is: ");//Serial.println((load >> 4) & 0x3);
-        //Serial.print("\nThe postamble is: ");//Serial.println(postamble);//Serial.println();
+
         if (shade_ID == ((load >> 4) & 0x3)) {
-          //Serial.println("ITS THIS SHADE ID!!!");
+                if (load >= SHADES_MIN && load <= SHADES_MAX) {
+
           int deg;
-          //Serial.println("RECIEVED SIGNAL FROM BLUETOOTH!!!");
           //  calculate degree from signal with offset and 3 degree intervals
           if (postamble == POST_ON) {   //  positive value
-            //Serial.println("\nopening shades!\n");
             deg = OFFSET + INTERVAL*(load & 0xF);
             //  write calculated degree to servo
             adjust_shade(deg);
             
           } else if (postamble == POST_OFF) {
-            //Serial.println("\nclosing shades!\n");
             deg = OFFSET - INTERVAL*(load & 0xF);  //   negative value
             //  write calculated degree to servo
             adjust_shade(deg);
             
           } /*else if (postamble < 12 && postamble > 7) { //  reset shade_ID
-            //Serial.print("CHANGING SHADE_ID to: ");//Serial.println(postamble & 0x3);
             set_shade_ID(postamble);
           }*/
         }
@@ -137,10 +128,7 @@ void loop() {
       //  check for signal from remote
     } else {
       unsigned long val = value >> 4; // remove postamble and store value
-      //Serial.print("Value looking for is: ");
-      //Serial.println(val);
       if (val == remote_ID[0] || val == remote_ID[1] || val == remote_ID[2]) {
-        //Serial.println("RECIEVED SIGNAL FROM REMOTE!!!!");
         if (postamble == POST_ON) {
           digitalWrite(LED_PIN, LOW);
           adjust_shade(25);    // open shades
@@ -154,9 +142,6 @@ void loop() {
     mySwitch.resetAvailable();
   }
 }
-
-
-
 
 void adjust_shade(int deg) {
   myServo.attach(SERVO_PIN);
@@ -185,18 +170,10 @@ void sync(void) {
     ; // wait until we get a signal
     
   sig = mySwitch.getReceivedValue();
-  //Serial.print("sig is: ");//Serial.println(sig);
-  //Serial.print("Preamble is: ");//Serial.println(parse_preamble(sig));
-  //Serial.print("Postamble is: ");//Serial.println(parse_postamble(sig));
-//  if (parse_preamble(sig) == PREAMBLE ) {
-  //Serial.print("sig >> 10 is: ");//Serial.println(sig >> 10);
-  //Serial.print("(sig >> 10) & 0x3FFF is: ");//Serial.println((sig >> 10) & 0x3FFF);
   if ( PARSE_SHADES_PREAMBLE(sig) == SHADES_PREAMBLE) {
     byte postamble = parse_postamble(sig);
     if (postamble > 7 && postamble < 12)
       set_shade_ID(postamble);
-//    else
-      //Serial.println("ERROR: invalid shade_ID\nMust be a number from 8-11!");
   } else {
     set_remote_ID(sig);
   }
@@ -208,7 +185,6 @@ void sync(void) {
 }
 
 void set_shade_ID(byte id) {
-  //Serial.print("CHANGING SHADE_ID to: ");//Serial.println(id & 0x3);
   shade_ID = id & 0x3;  //  get the ID from postamble of form 10XX
   EEPROM.write(0, shade_ID);
   //  signal that the new shade_ID has been successfully set
@@ -225,24 +201,13 @@ void set_remote_ID(unsigned long sig) {
   byte lsb, msb;
   
   sig = sig >> 4;
-  //Serial.print("ReceivedValue: ");
-  //Serial.println(sig);
   //  if new signal, save it
   if (remote_ID[ID_ptr] != sig) {
     remote_ID[ID_ptr] = sig;
     msb = (sig >> 12) & 0xFF;   //  first 8-bits of preamble
     lsb = (sig >> 4) & 0xC0;    //  last 2-bits of preamble
 
-    //Serial.print("MSB: ");
-    //Serial.print(msb);
-    //Serial.print("\tLSB: ");
-    //Serial.println(lsb);
-    //Serial.print("together it is: ");
-    //Serial.println((msb << 2) | (lsb >> 6));
-
     ch = (sig & 0x3FF);         //  last 10-bits of signal (channel/load)
-    //Serial.print("Channel is: ");
-    //Serial.println(ch);
 
     switch (ch) {
       case CH1: lsb |= 1; break;
@@ -252,11 +217,9 @@ void set_remote_ID(unsigned long sig) {
       case CH5: lsb |= 5; break;
     }
 
-
     //  save the new remote_ID (big endian)
     EEPROM.write(EEPROM_ptr, msb);
     EEPROM.write(EEPROM_ptr + 1, lsb);
-
   }
     //  adjust pointers
     if (EEPROM_ptr != 6)
